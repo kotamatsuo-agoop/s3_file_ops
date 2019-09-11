@@ -4,7 +4,6 @@
 # Date: 2018.10.19 (Fri)
 
 import os
-import re
 import time
 import logging
 import psutil

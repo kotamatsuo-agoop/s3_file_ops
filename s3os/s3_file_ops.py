@@ -24,20 +24,24 @@ from . import file_ops
 
 
 class S3os:
-    """For performing os module like routines inside S3 repositories.
-    
-    List of os methods supported:
-    
-    
-    Example:       
-        >>> S3OS = S3os(bucket_name)
-        >>> list_of_file_paths = S3OS.listdir(dir_path) # same as os.listdir()
-        >>> S3OS.copy(dir_path) # same as os.copy()
-        
-    Note:
-        'Path' & 'key' are synonyms except 'key' is for files on S3.
-    """
     def __init__(self, bucket_name):
+        """For performing os module like routines inside S3 repositories.
+    
+        List of os methods supported:
+            listdir, copy, remove, rename,
+            download_dir, upload_dir,
+            exists, create_if_not_exists, 
+            save_dataframe, 
+            read_all_csv_files_in_directory_as_one_df
+        
+        Example:       
+            >>> S3OS = S3os(bucket_name)
+            >>> list_of_file_paths = S3OS.listdir(dir_path) # same as os.listdir()
+            >>> S3OS.copy(dir_path) # same as os.copy()
+            
+        Note:
+            'Path' & 'key' are synonyms except 'key' is for files on S3.
+        """
         try:
             # If on AWS Sagemaker
             from sagemaker import get_execution_role
@@ -144,6 +148,7 @@ class S3os:
 #                 file_path = os.path.join(root, file)
 #                 self.client.upload_file(file_path, self.bucket_name, s3_dir_path + file)
 
+
     def exists(self, key_prefix, format_size=False):
         """Return the key's size if it exist, else None
         
@@ -190,7 +195,6 @@ class S3os:
         else:
             return size
 
-
     def create_if_not_exists(self, key):
         """Creates the folder/file if it doesn't already exist.
         
@@ -203,10 +207,37 @@ class S3os:
         """
         if self.exists(self.bucket_name, key) == None:
             self.client.put_object(Bucket=self.bucket_name, Key=key)
-            mem_check('Specified folder/file created')
+            mem_check('Following folder/file created: {}'.format(key))
         else:
-            mem_check('Specified folder/file already exists.')
+            mem_check('Follwoing folder/file already exists: {}'.format(key))
         return
+
+    def read_all_csv_files_in_directory_as_one_df(self, dir_path):
+        all_df = []
+        r_test = re.compile('[0-9]+')
+        list_of_all_files = self.listdir(dir_path)
+        n_files = len(list_of_all_files)
+        for idx, file in enumerate(list_of_all_files):
+            if idx % 50 == 0:
+                mem_check('Read {}/{}'.format(idx, n_files))
+
+            if ( file.endswith(".csv") ) & ( bool(r_test.search(file)) ):
+                start_of_n = r_test.search(file).start()
+                end_of_n   = r_test.search(file).end()
+                n_patents = int(file[start_of_n:end_of_n])
+                if n_patents == 0:
+                    continue
+                this_file_path = 's3://{}/{}'.format(self.bucket_name, file)
+                this_df = pd.read_csv(encoding='utf-8', filepath_or_buffer=this_file_path, delimiter=',', low_memory=False)
+#                 with codecs.open(this_file_path, "r", "utf-8", "ignore") as f:
+#                     this_df = pd.read_table(f, delimiter=",", low_memory=False)
+                all_df.append(this_df)
+            else:
+                pass
+        df = pd.concat(all_df, axis=0)
+        mem_check('Read all csv files in directory as one DataFrame')
+        return df
+
 
 #     def makedirs(name, mode=0o777, exist_ok=False):
 #         """makedirs(name [, mode=0o777][, exist_ok=False])
@@ -257,37 +288,3 @@ class S3os:
 #                 # could give priority to other errors like EACCES or EROFS
 #                 if not exist_ok or not self.is_dir():
 #     raise
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    def read_all_csv_files_in_directory_as_one_df(self, dir_path):
-        all_df = []
-        r_test = re.compile('[0-9]+')
-        list_of_all_files = self.listdir(dir_path)
-        n_files = len(list_of_all_files)
-        for idx, file in enumerate(list_of_all_files):
-            if idx % 50 == 0:
-                mem_check('Read {}/{}'.format(idx, n_files))
-
-            if ( file.endswith(".csv") ) & ( bool(r_test.search(file)) ):
-                start_of_n = r_test.search(file).start()
-                end_of_n   = r_test.search(file).end()
-                n_patents = int(file[start_of_n:end_of_n])
-                if n_patents == 0:
-                    continue
-                this_file_path = 's3://{}/{}'.format(self.bucket_name, file)
-                this_df = pd.read_csv(encoding='utf-8', filepath_or_buffer=this_file_path, delimiter=',', low_memory=False)
-#                 with codecs.open(this_file_path, "r", "utf-8", "ignore") as f:
-#                     this_df = pd.read_table(f, delimiter=",", low_memory=False)
-                all_df.append(this_df)
-            else:
-                pass
-        df = pd.concat(all_df, axis=0)
-        mem_check('Read all csv files in directory as one DataFrame')
-        return df
