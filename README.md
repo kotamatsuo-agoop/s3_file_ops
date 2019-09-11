@@ -1,4 +1,4 @@
-# s3_file_ops
+# The Python "os" module for files on AWS S3
 
 
 This module tries to mimic the builtin python "os" module, but for files on AWS S3.
